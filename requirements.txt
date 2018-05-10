@@ -1,2 +1,3 @@
 pyTelegramBotApi
 sympy
+git+https://github.com/MarcoBuster/ClasseVivaAPI
