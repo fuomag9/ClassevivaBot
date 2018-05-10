@@ -69,7 +69,7 @@ exec_query("""CREATE TABLE IF NOT EXISTS CREDENTIALS (
 
 @bot.message_handler(commands=['start', 'help'])
 def handle_start_help(message):
-    risposta(message.chat.id,"/login per accedere \n/periodo per impostare il numero del periodo \n /medie per vedere le medie e che voto per avere la sufficenza ")
+    risposta(message.chat.id, "/login per accedere \n/periodo per impostare il numero del periodo \n /medie per vedere le medie e che voto per avere la sufficenza ")
 
 
 @bot.message_handler(commands=['periodo'])
@@ -99,11 +99,12 @@ def handle_login(message):
             return
         username = message.text.split(" ")[1]
         print(username)
-        password= message.text.split(" ")[2]
+        password = message.text.split(" ")[2]
         print(password)
     except Exception as e:
         handle_exception(e)
-    exec_query("INSERT INTO CREDENTIALS (USERNAME,PASSWORD,CHAT_ID) VALUES('{}','{}','{}')".format(username,password,message.chat.id))
+    exec_query("INSERT INTO CREDENTIALS (USERNAME,PASSWORD,CHAT_ID) VALUES('{}','{}','{}')".format(
+        username, password, message.chat.id))
     risposta(message.chat.id, "login effettuato correttamente")
 
 
@@ -142,7 +143,7 @@ def handle_medie(message):
         dizionario_voti = {}
         medie = {}
         voti_sufficienza = {}
-        output_risposta=''
+        output_risposta = ''
         for x in voti_json['grades']:  # ottenimento lista voti
             voti_periodo.append(x)
         # rimozione voti non appartenenti al periodo non voluto
@@ -163,13 +164,17 @@ def handle_medie(message):
                     medie[materia] = voto
             voti_sufficienza[materia] = round(solve(
                 (incognita_eq + medie[materia]) / (len(dizionario_voti[materia]) + 1) - 6)[0], 2)
-            medie[materia] = medie[materia] / len(dizionario_voti[materia])
+            medie[materia] = round(
+                medie[materia] / len(dizionario_voti[materia]), 2)
 
         for materia in voti_sufficienza:
-            output_risposta+="per avere la sufficenza in "+str(materia)+" devi prendere "+str(voti_sufficienza[materia])+"\n"
-        output_risposta+="\n\n\n"
+            output_risposta += "per avere la sufficenza in " + \
+                str(materia) + " devi prendere " + \
+                str(voti_sufficienza[materia]) + "\n"
+        output_risposta += "\n\n\n"
         for materia in medie:
-            output_risposta+="la media in "+str(materia)+" è "+str(medie[materia])+"\n"
+            output_risposta += "la media in " + \
+                str(materia) + " è " + str(medie[materia]) + "\n"
         risposta_html(message.chat.id, output_risposta)
     except Exception as e:
         handle_exception(e)
