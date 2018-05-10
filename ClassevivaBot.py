@@ -74,7 +74,6 @@ def handle_start_help(message):
 
 @bot.message_handler(commands=['periodo'])
 def handle_periodo(message):
-    print("add")
     try:
         if len(message.text.split(" ")) < 2:
             risposta(
@@ -90,6 +89,8 @@ def handle_periodo(message):
 
 
 @bot.message_handler(commands=['login'])
+
+#todo: controllare se nel db è già presente una entry relativa al chatid, e se non è presente fare il login
 def handle_login(message):
     print("login")
     try:
@@ -105,7 +106,7 @@ def handle_login(message):
         handle_exception(e)
     exec_query("INSERT INTO CREDENTIALS (USERNAME,PASSWORD,CHAT_ID) VALUES('{}','{}','{}')".format(
         username, password, message.chat.id))
-    risposta(message.chat.id, "login effettuato correttamente")
+    risposta(message.chat.id, "login effettuato correttamente, il periodo impostato è il primo")
 
 
 @bot.message_handler(commands=['medie'])
@@ -169,12 +170,13 @@ def handle_medie(message):
 
         for materia in voti_sufficienza:
             output_risposta += "per avere la sufficenza in " + \
-                str(materia) + " devi prendere " + \
-                str(voti_sufficienza[materia]) + "\n"
+                "<b>" + str(materia) + "</b>" + " devi prendere " + \
+                "<b>" + str(voti_sufficienza[materia]) + "</b>" + "\n"
         output_risposta += "\n\n\n"
         for materia in medie:
             output_risposta += "la media in " + \
-                str(materia) + " è " + str(medie[materia]) + "\n"
+                "<b>" + str(materia) + "</b>" + " è " + "<b>" + \
+                str(medie[materia]) + "</b>" + "\n"
         risposta_html(message.chat.id, output_risposta)
     except Exception as e:
         handle_exception(e)
