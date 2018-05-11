@@ -93,20 +93,32 @@ def handle_periodo(message):
 #todo: controllare se nel db è già presente una entry relativa al chatid, e se non è presente fare il login
 def handle_login(message):
     print("login")
+    chatid=message.chat.id
     try:
         if len(message.text.split(" ")) < 3:
             risposta(
-                message.chat.id, "You may have made a mistake, check your input and try again")
+                chatid, "You may have made a mistake, check your input and try again")
             return
         username = message.text.split(" ")[1]
-        print(username)
         password = message.text.split(" ")[2]
-        print(password)
     except Exception as e:
         handle_exception(e)
-    exec_query("INSERT INTO CREDENTIALS (USERNAME,PASSWORD,CHAT_ID) VALUES('{}','{}','{}')".format(
-        username, password, message.chat.id))
-    risposta(message.chat.id, "login effettuato correttamente, il periodo impostato è il primo")
+    db = sqlite3.connect(bot_path + '/database.db')
+    cursor = db.cursor()
+    sql = "SELECT USERNAME,PASSWORD,PERIODO FROM CREDENTIALS \
+        WHERE CHAT_ID='{}'".format(chatid)
+    try:
+        cursor.execute(sql)
+        results = cursor.fetchall()
+    except Exception as e:
+        handle_exception(e)
+    finally:
+        db.close()
+    if results==[]:
+     exec_query("INSERT INTO CREDENTIALS (USERNAME,PASSWORD,CHAT_ID) VALUES('{}','{}','{}')".format(username, password, message.chat.id))
+     risposta(chatid, "login effettuato correttamente, il periodo impostato è il primo")
+    else:
+     risposta(chatid,"Il login è già stato effettuato")
 
 
 @bot.message_handler(commands=['medie'])
