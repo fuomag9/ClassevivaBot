@@ -89,11 +89,9 @@ def handle_periodo(message):
 
 
 @bot.message_handler(commands=['login'])
-
-#todo: controllare se nel db è già presente una entry relativa al chatid, e se non è presente fare il login
 def handle_login(message):
     print("login")
-    chatid=message.chat.id
+    chatid = message.chat.id
     try:
         if len(message.text.split(" ")) < 3:
             risposta(
@@ -114,11 +112,31 @@ def handle_login(message):
         handle_exception(e)
     finally:
         db.close()
-    if results==[]:
-     exec_query("INSERT INTO CREDENTIALS (USERNAME,PASSWORD,CHAT_ID) VALUES('{}','{}','{}')".format(username, password, message.chat.id))
-     risposta(chatid, "login effettuato correttamente, il periodo impostato è il primo")
+    if results == []:
+        exec_query("INSERT INTO CREDENTIALS (USERNAME,PASSWORD,CHAT_ID) VALUES('{}','{}','{}')".format(
+            username, password, message.chat.id))
+        risposta(
+            chatid, "login effettuato correttamente, il periodo impostato è il primo")
     else:
-     risposta(chatid,"Il login è già stato effettuato")
+        risposta(chatid, "Il login è già stato effettuato")
+
+
+@bot.message_handler(commands=['remove'])
+def handle_remove(message):
+    print("remove")
+    chatid = message.chat.id
+    db = sqlite3.connect(bot_path + '/database.db')
+    cursor = db.cursor()
+    sql = "SELECT USERNAME,PASSWORD,PERIODO FROM CREDENTIALS \
+        WHERE CHAT_ID='{}'".format(chatid)
+    try:
+        exec_query("DELETE FROM CREDENTIALS WHERE CHAT_ID='{}'".format(chatid))
+        risposta(
+            chatid, "login effettuato correttamente, il periodo impostato è il primo")
+    except Exception as e:
+        handle_exception(e)
+        risposta(
+            chatid, "Si è verificato un errore o non è mai stato effettuato il login")
 
 
 @bot.message_handler(commands=['medie'])
