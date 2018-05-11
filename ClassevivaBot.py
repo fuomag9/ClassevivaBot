@@ -69,7 +69,7 @@ exec_query("""CREATE TABLE IF NOT EXISTS CREDENTIALS (
 
 @bot.message_handler(commands=['start', 'help'])
 def handle_start_help(message):
-    risposta(message.chat.id, "/login per accedere \n/periodo per impostare il numero del periodo \n /medie per vedere le medie e che voto per avere la sufficenza ")
+    risposta(message.chat.id, "/login per accedere\n/logout per disconnettersi\n/periodo per impostare il numero del periodo \n /medie per vedere le medie e che voto per avere la sufficenza ")
 
 
 @bot.message_handler(commands=['periodo'])
@@ -121,8 +121,8 @@ def handle_login(message):
         risposta(chatid, "Il login è già stato effettuato")
 
 
-@bot.message_handler(commands=['remove'])
-def handle_remove(message):
+@bot.message_handler(commands=['logout'])
+def handle_logout(message):
     print("remove")
     chatid = message.chat.id
     db = sqlite3.connect(bot_path + '/database.db')
@@ -132,7 +132,7 @@ def handle_remove(message):
     try:
         exec_query("DELETE FROM CREDENTIALS WHERE CHAT_ID='{}'".format(chatid))
         risposta(
-            chatid, "login effettuato correttamente, il periodo impostato è il primo")
+            chatid, "Logout effettuato correttamente")
     except Exception as e:
         handle_exception(e)
         risposta(
