@@ -69,7 +69,7 @@ exec_query("""CREATE TABLE IF NOT EXISTS CREDENTIALS (
 
 @bot.message_handler(commands=['start', 'help'])
 def handle_start_help(message):
-    risposta(message.chat.id, "/login per accedere\n/logout per disconnettersi\n/periodo per impostare il numero del periodo \n /medie per vedere le medie e che voto per avere la sufficenza ")
+    risposta_html(message.chat.id, "/login <i>username</i> <i>password</i> per accedere\n/logout per disconnettersi\n/periodo per impostare il numero del periodo \n /medie per vedere le medie e che voto per avere la sufficenza ")
 
 
 @bot.message_handler(commands=['periodo'])
