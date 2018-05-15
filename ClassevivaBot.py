@@ -130,6 +130,16 @@ def handle_logout(message):
     sql = "SELECT USERNAME,PASSWORD,PERIODO FROM CREDENTIALS \
         WHERE CHAT_ID='{}'".format(chatid)
     try:
+        cursor.execute(sql)
+        results = cursor.fetchall()
+    except Exception as e:
+        handle_exception(e)
+    finally:
+        db.close()
+    if results == []:
+    	risposta(chatid,"Non è mai stato effettuato il login, niente da rimuovere")    
+    	return
+    try:
         exec_query("DELETE FROM CREDENTIALS WHERE CHAT_ID='{}'".format(chatid))
         risposta(
             chatid, "Logout effettuato correttamente")
@@ -158,9 +168,11 @@ def handle_medie(message):
             periodo.append(row[2])
     except Exception as e:
         handle_exception(e)
-        '#stampare che non si è mai fatto il login'
     finally:
         db.close()
+        if results==[]:
+        	risposta(chatid,"Non è mai stato fatto il login, effettualo attraverso il comando apposito")
+        	return
     try:
         classeviva_session = cv.Session()
         classeviva_session.username = username[0]
