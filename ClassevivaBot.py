@@ -133,12 +133,12 @@ def calcola_medie(username, password, periodo):
                 medie_vecchie[materia] / len(dizionario_voti[materia]), 2)
 
     for materia in voti_sufficienza:
-        output_risposta += "per avere la sufficenza in " + \
+        output_risposta += "Per avere la sufficenza in " + \
             "<b>" + str(materia) + "</b>" + " devi prendere " + \
             "<b>" + str(voti_sufficienza[materia]) + "</b>" + "\n"
     output_risposta += "\n\n\n"
     for materia in medie:
-        output_risposta += "la media in " + \
+        output_risposta += "La media in " + \
             "<b>" + str(materia) + "</b>" + " è " + "<b>" + \
             str(medie[materia]) + "</b>" + "\n"
     return output_risposta, medie_vecchie
