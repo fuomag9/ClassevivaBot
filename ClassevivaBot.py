@@ -73,6 +73,8 @@ def calcola_medie(username, password, periodo):
                              classeviva_session.password)
     voti_json = classeviva_session.grades()
     classeviva_session.logout()
+    if voti_json==null or voti_json == []:
+        return "Attualmente non sono disponibili voti"
     voti_periodo = []
     voti_periodo_fix = []
     dizionario_voti = {}
