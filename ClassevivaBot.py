@@ -73,8 +73,8 @@ def calcola_medie(username, password, periodo):
                              classeviva_session.password)
     voti_json = classeviva_session.grades()
     classeviva_session.logout()
-    if voti_json==null or voti_json == []:
-        return "Attualmente non sono disponibili voti"
+    if voti_json['grades'] == []:
+        raise ValueError('No grades')
     voti_periodo = []
     voti_periodo_fix = []
     dizionario_voti = {}
@@ -275,9 +275,13 @@ def telegram_bot():
                 "Non è mai stato fatto il login, effettualo attraverso il comando apposito"
             )
             return
-        output_risposta = calcola_medie(username[0], password[0],
-                                        periodo[0])[0]
-        risposta_html(message.chat.id, output_risposta)
+        output_risposta = []
+        try:
+         output_risposta = calcola_medie(username[0], password[0], periodo[0])[0]
+         risposta_html(message.chat.id, output_risposta)
+        except ValueError:
+            risposta_html(message.chat.id, "Errore, probabilmente non ci sono voti sul registro")
+
 
     while True:
         try:
