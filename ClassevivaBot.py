@@ -155,15 +155,25 @@ def calcola_medie(username, password, periodo):
             medie_vecchie[materia] = round(
                 medie_vecchie[materia] / len(dizionario_voti[materia]), 2)
 
+    def sign_replace(x):
+        if ".25" in str(x):
+            return str(x).replace(".25", "+")
+        elif ".75" in str(x):
+            return str(int(str(x).replace(".75", ""))+1)+"-"
+        else:
+            return str(x)
+
     for materia in voti_sufficienza:
         output_risposta += "Per avere la sufficenza in " + \
             "<b>" + str(materia) + "</b>" + " devi prendere " + \
-            "<b>" + str(voti_sufficienza[materia]) + "</b>" + "\n"
+            "<b>" + sign_replace(voti_sufficienza[materia]) + "</b>" + "\n"
     output_risposta += "\n\n\n"
+
     for materia in medie:
         output_risposta += "La media in " + \
             "<b>" + str(materia) + "</b>" + " è " + "<b>" + \
-            str(medie[materia]) + "</b>" + "\n"
+            sign_replace(medie[materia]) + "</b>" + "\n"
+
     return output_risposta, medie_vecchie
 
 
@@ -172,6 +182,7 @@ def start(bot, update):
         update.message.chat.id,
         "/login <i>username</i> <i>password</i> per accedere\n/logout per disconnettersi\n/periodo per impostare il numero del periodo \n /medie per vedere le medie e che voto per avere la sufficenza ", bot
     )
+
 
 def periodo(bot, update, args):
     try:
@@ -190,6 +201,7 @@ def periodo(bot, update, args):
         SET PERIODO='{}'\
         WHERE CHAT_ID='{}'".format(periodo, chatid))
     risposta(chatid, "periodo aggiornato", bot)
+
 
 def login(bot, update, args):
     print("login")
@@ -227,6 +239,7 @@ def login(bot, update, args):
     else:
         risposta(chatid, "Il login è già stato effettuato", bot)
 
+
 def logout(bot, update):
     print("remove")
     chatid = update.message.chat.id
@@ -256,6 +269,7 @@ def logout(bot, update):
             chatid,
             "Si è verificato un errore o non è mai stato effettuato il login", bot
         )
+
 
 def medie(bot, update):
     chatid = update.message.chat.id
@@ -289,13 +303,13 @@ def medie(bot, update):
             username[0], password[0], periodo[0])[0]
         risposta_html(chatid, output_risposta, bot)
     except ValueError as e:
-        error_value=e.args[0]
-        if error_value=="No grades":
-            risposta(chatid, "Errore, probabilmente non ci sono voti sul registro", bot)
-        elif error_value=="Login error":
-            risposta(chatid, "Errore, probabilmente le tue credenziali sono errate, fai il logout e riprova", bot)
-
-
+        error_value = e.args[0]
+        if error_value == "No grades":
+            risposta(
+                chatid, "Errore, probabilmente non ci sono voti sul registro", bot)
+        elif error_value == "Login error":
+            risposta(
+                chatid, "Errore, probabilmente le tue credenziali sono errate, fai il logout e riprova", bot)
 
 
 def telegram_bot():
