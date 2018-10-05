@@ -1,13 +1,20 @@
 # -*- coding: utf-8 -*-
-import telebot
+import argparse
+import logging
 import os
 import os.path
-import argparse
 import sqlite3
-import classeviva as cv
-from sympy import Symbol, solve
-from datetime import date
 import threading
+from datetime import date
+
+import classeviva as cv
+import telegram
+from sympy import Symbol, solve
+from telegram.ext import CommandHandler, Updater
+
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    level=logging.INFO)
+
 ap = argparse.ArgumentParser()
 ap.add_argument(
     "-k", "--key", required=True, type=str, help="Telegram bot key")
@@ -17,11 +24,11 @@ ap.add_argument(
     required=False,
     type=str,
     default=os.getcwd(),
-    help=
-    "set the bot's working-folder, default is folder from where the bot is executed"
+    help="set the bot's working-folder, default is folder from where the bot is executed"
 )
 args = vars(ap.parse_args())
-bot = telebot.TeleBot(args["key"])
+updater = Updater(token=args["key"])
+dispatcher = updater.dispatcher
 bot_path = args["working_folder"]
 incognita_eq = Symbol("x")
 
@@ -30,18 +37,19 @@ def handle_exception(e):
     print(str(e))
 
 
-def risposta(sender, messaggio):
+def risposta(sender, messaggio, bot):
     try:
-        bot.send_chat_action(sender, action="typing")
-        bot.send_message(sender, messaggio)
+        bot.send_chat_action(chat_id=sender, action="typing")
+        bot.send_message(chat_id=sender, text=messaggio)
     except Exception as e:
         handle_exception(e)
 
 
-def risposta_html(sender, messaggio):
+def risposta_html(sender, messaggio, bot):
     try:
-        bot.send_chat_action(sender, action="typing")
-        bot.send_message(sender, messaggio, parse_mode="HTML")
+        bot.send_chat_action(chat_id=sender, action="typing")
+        bot.send_message(chat_id=sender, text=messaggio,
+                         parse_mode=telegram.ParseMode.HTML)
     except Exception as e:
         handle_exception(e)
 
@@ -65,12 +73,25 @@ def exec_query(query):
     db.close()
 
 
+# default table creation
+exec_query("""CREATE TABLE IF NOT EXISTS CREDENTIALS (
+  USERNAME CHAR(60) NOT NULL,
+  PASSWORD CHAR(60),
+  PERIODO TINYINT DEFAULT 1,
+  CHAT_ID CHAR(100)
+)""")
+
+
 def calcola_medie(username, password, periodo):
     classeviva_session = cv.Session()
     classeviva_session.username = username
     classeviva_session.password = password
-    classeviva_session.login(classeviva_session.username,
-                             classeviva_session.password)
+    try:
+        classeviva_session.login(classeviva_session.username,
+                                 classeviva_session.password)
+    except cv.errors.AuthenticationFailedError:
+        raise ValueError("Login error")
+
     voti_json = classeviva_session.grades()
     classeviva_session.logout()
     if voti_json['grades'] == []:
@@ -97,7 +118,7 @@ def calcola_medie(username, password, periodo):
                 voti_periodo_fix[x]['subjectDesc'], []).append(
                     (voti_periodo_fix[x]['decimalValue'],
                      voti_periodo_fix[x]['evtDate']))
-    #medie nuove
+    # medie nuove
     for materia in dizionario_voti:
         for tupla_voto in dizionario_voti[materia]:
             if materia in medie:  # i dizionari sono stupidi e se la key non esiste già non si può utilizzare +=
@@ -110,20 +131,20 @@ def calcola_medie(username, password, periodo):
         medie[materia] = round(medie[materia] / len(dizionario_voti[materia]),
                                2)
 
-    #trovare voti nuovi
+    # trovare voti nuovi
     for materia in dizionario_voti:
         if dizionario_voti[materia][len(dizionario_voti[materia])
                                     - 1][1].split("-")[2] == date.today().day:
             voti_nuovi.append(materia)
-    #calcolare media vecchia
+    # calcolare media vecchia
     if voti_nuovi != []:
         for materia in dizionario_voti:
             if materia in voti_nuovi:
                 dizionario_voti[materia] = dizionario_voti[materia][:-1]
-                #rimuove l'ultimo elemento dall'array del voto(in quanto l'ultimo voto dovrebbe essere quello nuovo)
+                # rimuove l'ultimo elemento dall'array del voto(in quanto l'ultimo voto dovrebbe essere quello nuovo)
             else:
                 dizionario_voti.pop(materia)
-                #rimuove la materia nelle quali non sono cambiati i voti
+                # rimuove la materia nelle quali non sono cambiati i voti
         for materia in dizionario_voti:
             for tupla_voto in dizionario_voti[materia]:
                 if materia in medie_vecchie:
@@ -146,152 +167,164 @@ def calcola_medie(username, password, periodo):
     return output_risposta, medie_vecchie
 
 
-# default table creation
-exec_query("""CREATE TABLE IF NOT EXISTS CREDENTIALS (
-  USERNAME CHAR(60) NOT NULL,
-  PASSWORD CHAR(60),
-  PERIODO TINYINT DEFAULT 1,
-  CHAT_ID CHAR(100)
-)""")
+def start(bot, update):
+    risposta_html(
+        update.message.chat.id,
+        "/login <i>username</i> <i>password</i> per accedere\n/logout per disconnettersi\n/periodo per impostare il numero del periodo \n /medie per vedere le medie e che voto per avere la sufficenza ", bot
+    )
+
+def periodo(bot, update, args):
+    try:
+        periodo = None
+        chatid = update.message.chat.id
+        if len(args) > 1:
+            risposta(
+                chatid,
+                "You may have made a mistake, check your input and try again", bot
+            )
+            return
+        periodo = args[0]
+    except Exception as e:
+        handle_exception(e)
+    exec_query("UPDATE CREDENTIALS \
+        SET PERIODO='{}'\
+        WHERE CHAT_ID='{}'".format(periodo, chatid))
+    risposta(chatid, "periodo aggiornato", bot)
+
+def login(bot, update, args):
+    print("login")
+    chatid = update.message.chat.id
+    try:
+        if len(args) > 2:
+            risposta(
+                chatid,
+                "You may have made a mistake, check your input and try again", bot
+            )
+            return
+        username = args[0]
+        password = args[1]
+    except Exception as e:
+        handle_exception(e)
+    db = sqlite3.connect(bot_path + '/database.db')
+    cursor = db.cursor()
+    sql = "SELECT USERNAME,PASSWORD,PERIODO FROM CREDENTIALS \
+        WHERE CHAT_ID='{}'".format(chatid)
+    try:
+        cursor.execute(sql)
+        results = cursor.fetchall()
+    except Exception as e:
+        handle_exception(e)
+    finally:
+        db.close()
+    if results == []:
+        exec_query(
+            "INSERT INTO CREDENTIALS (USERNAME,PASSWORD,CHAT_ID) VALUES('{}','{}','{}')".
+            format(username, password, chatid))
+        risposta(
+            chatid,
+            "login effettuato correttamente, il periodo impostato è il primo", bot
+        )
+    else:
+        risposta(chatid, "Il login è già stato effettuato", bot)
+
+def logout(bot, update):
+    print("remove")
+    chatid = update.message.chat.id
+    db = sqlite3.connect(bot_path + '/database.db')
+    cursor = db.cursor()
+    sql = "SELECT USERNAME,PASSWORD,PERIODO FROM CREDENTIALS \
+        WHERE CHAT_ID='{}'".format(chatid)
+    try:
+        cursor.execute(sql)
+        results = cursor.fetchall()
+    except Exception as e:
+        handle_exception(e)
+    finally:
+        db.close()
+    if results == []:
+        risposta(
+            chatid,
+            "Non è mai stato effettuato il login, niente da rimuovere", bot)
+        return
+    try:
+        exec_query(
+            "DELETE FROM CREDENTIALS WHERE CHAT_ID='{}'".format(chatid))
+        risposta(chatid, "Logout effettuato correttamente", bot)
+    except Exception as e:
+        handle_exception(e)
+        risposta(
+            chatid,
+            "Si è verificato un errore o non è mai stato effettuato il login", bot
+        )
+
+def medie(bot, update):
+    chatid = update.message.chat.id
+    username = []
+    password = []
+    periodo = []
+    db = sqlite3.connect(bot_path + '/database.db')
+    cursor = db.cursor()
+    sql = "SELECT USERNAME,PASSWORD,PERIODO FROM CREDENTIALS \
+        WHERE CHAT_ID='{}'".format(chatid)
+    try:
+        cursor.execute(sql)
+        results = cursor.fetchall()
+        for row in results:
+            username.append(row[0])
+            password.append(row[1])
+            periodo.append(row[2])
+    except Exception as e:
+        handle_exception(e)
+    finally:
+        db.close()
+    if results == []:
+        risposta(
+            chatid,
+            "Non è mai stato fatto il login, effettualo attraverso il comando apposito", bot
+        )
+        return
+    output_risposta = []
+    try:
+        output_risposta = calcola_medie(
+            username[0], password[0], periodo[0])[0]
+        risposta_html(chatid, output_risposta, bot)
+    except ValueError as e:
+        error_value=e.args[0]
+        if error_value=="No grades":
+            risposta(chatid, "Errore, probabilmente non ci sono voti sul registro", bot)
+        elif error_value=="Login error":
+            risposta(chatid, "Errore, probabilmente le tue credenziali sono errate, fai il logout e riprova", bot)
+
+
 
 
 def telegram_bot():
-    @bot.message_handler(commands=['start', 'help'])
-    def handle_start_help(message):
-        risposta_html(
-            message.chat.id,
-            "/login <i>username</i> <i>password</i> per accedere\n/logout per disconnettersi\n/periodo per impostare il numero del periodo \n /medie per vedere le medie e che voto per avere la sufficenza "
-        )
-
-    @bot.message_handler(commands=['periodo'])
-    def handle_periodo(message):
-        try:
-            if len(message.text.split(" ")) < 2:
-                risposta(
-                    message.chat.id,
-                    "You may have made a mistake, check your input and try again"
-                )
-                return
-            periodo = message.text.split(" ")[1]
-        except Exception as e:
-            handle_exception(e)
-        exec_query("UPDATE CREDENTIALS \
-        SET PERIODO='{}'\
-        WHERE CHAT_ID='{}'".format(periodo, message.chat.id))
-        risposta(message.chat.id, "periodo aggiornato")
-
-    @bot.message_handler(commands=['login'])
-    def handle_login(message):
-        print("login")
-        chatid = message.chat.id
-        try:
-            if len(message.text.split(" ")) < 3:
-                risposta(
-                    chatid,
-                    "You may have made a mistake, check your input and try again"
-                )
-                return
-            username = message.text.split(" ")[1]
-            password = message.text.split(" ")[2]
-        except Exception as e:
-            handle_exception(e)
-        db = sqlite3.connect(bot_path + '/database.db')
-        cursor = db.cursor()
-        sql = "SELECT USERNAME,PASSWORD,PERIODO FROM CREDENTIALS \
-        WHERE CHAT_ID='{}'".format(chatid)
-        try:
-            cursor.execute(sql)
-            results = cursor.fetchall()
-        except Exception as e:
-            handle_exception(e)
-        finally:
-            db.close()
-        if results == []:
-            exec_query(
-                "INSERT INTO CREDENTIALS (USERNAME,PASSWORD,CHAT_ID) VALUES('{}','{}','{}')".
-                format(username, password, message.chat.id))
-            risposta(
-                chatid,
-                "login effettuato correttamente, il periodo impostato è il primo"
-            )
-        else:
-            risposta(chatid, "Il login è già stato effettuato")
-
-    @bot.message_handler(commands=['logout'])
-    def handle_logout(message):
-        print("remove")
-        chatid = message.chat.id
-        db = sqlite3.connect(bot_path + '/database.db')
-        cursor = db.cursor()
-        sql = "SELECT USERNAME,PASSWORD,PERIODO FROM CREDENTIALS \
-        WHERE CHAT_ID='{}'".format(chatid)
-        try:
-            cursor.execute(sql)
-            results = cursor.fetchall()
-        except Exception as e:
-            handle_exception(e)
-        finally:
-            db.close()
-        if results == []:
-            risposta(
-                chatid,
-                "Non è mai stato effettuato il login, niente da rimuovere")
-            return
-        try:
-            exec_query(
-                "DELETE FROM CREDENTIALS WHERE CHAT_ID='{}'".format(chatid))
-            risposta(chatid, "Logout effettuato correttamente")
-        except Exception as e:
-            handle_exception(e)
-            risposta(
-                chatid,
-                "Si è verificato un errore o non è mai stato effettuato il login"
-            )
-
-    @bot.message_handler(commands=['medie'])
-    def handle_medie(message):
-        chatid = message.chat.id
-        username = []
-        password = []
-        periodo = []
-        db = sqlite3.connect(bot_path + '/database.db')
-        cursor = db.cursor()
-        sql = "SELECT USERNAME,PASSWORD,PERIODO FROM CREDENTIALS \
-        WHERE CHAT_ID='{}'".format(chatid)
-        try:
-            cursor.execute(sql)
-            results = cursor.fetchall()
-            for row in results:
-                username.append(row[0])
-                password.append(row[1])
-                periodo.append(row[2])
-        except Exception as e:
-            handle_exception(e)
-        finally:
-            db.close()
-        if results == []:
-            risposta(
-                chatid,
-                "Non è mai stato fatto il login, effettualo attraverso il comando apposito"
-            )
-            return
-        output_risposta = []
-        try:
-         output_risposta = calcola_medie(username[0], password[0], periodo[0])[0]
-         risposta_html(message.chat.id, output_risposta)
-        except ValueError:
-            risposta_html(message.chat.id, "Errore, probabilmente non ci sono voti sul registro")
-
 
     while True:
         try:
-            bot.polling(none_stop=True)
+            updater.start_polling()
         except Exception as e:
             handle_exception(e)
 
 
 def check_voti():
     pass
+
+
+start_handler = CommandHandler(('start', 'help'), start)
+dispatcher.add_handler(start_handler)
+
+periodo_handler = CommandHandler('periodo', periodo, pass_args=True)
+dispatcher.add_handler(periodo_handler)
+
+login_handler = CommandHandler('login', login, pass_args=True)
+dispatcher.add_handler(login_handler)
+
+logout_handler = CommandHandler('logout', logout)
+dispatcher.add_handler(logout_handler)
+
+medie_handler = CommandHandler('medie', medie)
+dispatcher.add_handler(medie_handler)
 
 
 threads = []
