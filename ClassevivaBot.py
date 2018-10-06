@@ -340,7 +340,10 @@ def check_voti():
                 exec_query("UPDATE CREDENTIALS \
                 SET NUMERO_VOTI='{}'\
                 WHERE CHAT_ID='{}'".format(numero_voti, chatid_list[x]))
-                risposta(chatid_list[x],"C'è un nuovo voto!",bot)
+                if numero_voti_list[x]==0:
+                    risposta(chatid_list[x],"C'è un nuovo voto!(potrebbe non essere vero in quanto l'anno è appena iniziato e sono stati resettati i voti)",bot)
+                else:    
+                 risposta(chatid_list[x],"C'è un nuovo voto!",bot)
 
 
 
