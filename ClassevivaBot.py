@@ -78,7 +78,8 @@ exec_query("""CREATE TABLE IF NOT EXISTS CREDENTIALS (
   USERNAME CHAR(60) NOT NULL,
   PASSWORD CHAR(60),
   PERIODO TINYINT DEFAULT 1,
-  CHAT_ID CHAR(100)
+  CHAT_ID CHAR(100),
+  NUMERO_VOTI INTEGER DEFAULT 0
 )""")
 
 
@@ -87,22 +88,21 @@ def calcola_medie(username, password, periodo):
     classeviva_session.username = username
     classeviva_session.password = password
     try:
-        classeviva_session.login(classeviva_session.username,
-                                 classeviva_session.password)
+        classeviva_session.login()
     except cv.errors.AuthenticationFailedError:
         raise ValueError("Login error")
 
     voti_json = classeviva_session.grades()
     classeviva_session.logout()
+
     if voti_json['grades'] == []:
         raise ValueError('No grades')
+
     voti_periodo = []
     voti_periodo_fix = []
     dizionario_voti = {}
     medie = {}
-    medie_vecchie = {}
     voti_sufficienza = {}
-    voti_nuovi = []
     output_risposta = ''
     for x in voti_json['grades']:  # ottenimento lista voti
         voti_periodo.append(x)
@@ -125,35 +125,19 @@ def calcola_medie(username, password, periodo):
                 medie[materia] += tupla_voto[0]
             else:
                 medie[materia] = tupla_voto[0]
+
+        #voti sufficienza        
         voti_sufficienza[materia] = round(
             solve((incognita_eq + medie[materia]) /
                   (len(dizionario_voti[materia]) + 1) - 6)[0], 2)
+
+        #medie delle materie          
         medie[materia] = round(medie[materia] / len(dizionario_voti[materia]),
                                2)
-
-    # trovare voti nuovi
-    for materia in dizionario_voti:
-        if dizionario_voti[materia][len(dizionario_voti[materia])
-                                    - 1][1].split("-")[2] == date.today().day:
-            voti_nuovi.append(materia)
-    # calcolare media vecchia
-    if voti_nuovi != []:
+        #conta voti
+        conta_voti=0
         for materia in dizionario_voti:
-            if materia in voti_nuovi:
-                dizionario_voti[materia] = dizionario_voti[materia][:-1]
-                # rimuove l'ultimo elemento dall'array del voto(in quanto l'ultimo voto dovrebbe essere quello nuovo)
-            else:
-                dizionario_voti.pop(materia)
-                # rimuove la materia nelle quali non sono cambiati i voti
-        for materia in dizionario_voti:
-            for tupla_voto in dizionario_voti[materia]:
-                if materia in medie_vecchie:
-                    # i dizionari sono stupidi e se la key non esiste già non si può utilizzare +=
-                    medie_vecchie[materia] += tupla_voto[0]
-                else:
-                    medie_vecchie[materia] = tupla_voto[0]
-            medie_vecchie[materia] = round(
-                medie_vecchie[materia] / len(dizionario_voti[materia]), 2)
+            conta_voti=conta_voti+len(dizionario_voti[materia])   
 
     def sign_replace(x):
         if ".25" in str(x):
@@ -174,7 +158,7 @@ def calcola_medie(username, password, periodo):
             "<b>" + str(materia) + "</b>" + " è " + "<b>" + \
             sign_replace(medie[materia]) + "</b>" + "\n"
 
-    return output_risposta, medie_vecchie
+    return output_risposta, conta_voti
 
 
 def start(bot, update):
@@ -322,7 +306,42 @@ def telegram_bot():
 
 
 def check_voti():
-    pass
+    global updater
+    bot = updater.bot
+    while (1):
+        username_list = []
+        password_list = []
+        periodo_list = []
+        chatid_list = []
+        numero_voti_list=[]
+        sql = "SELECT * FROM CREDENTIALS"
+        try:
+            db = sqlite3.connect(bot_path + '/database.db')
+            cursor = db.cursor()
+            cursor.execute(sql)
+            results = cursor.fetchall()
+            for row in results:
+                username_list.append(row[0])
+                password_list.append(row[1])
+                periodo_list.append(row[2])
+                chatid_list.append(row[3])
+                numero_voti_list.append(row[4])
+        except Exception as e:
+            handle_exception(e)
+        finally:
+            db.close()
+        for x in range(0, len(username_list)):
+            numero_voti= calcola_medie(username_list[x], password_list[x], periodo_list[x])[1]
+            if numero_voti < numero_voti_list[x]:
+                exec_query("UPDATE CREDENTIALS \
+                SET NUMERO_VOTI='{}'\
+                WHERE CHAT_ID='{}'".format(numero_voti, chatid_list[x]))
+            elif numero_voti > numero_voti_list[x]:    # c'è un nuovo voto
+                exec_query("UPDATE CREDENTIALS \
+                SET NUMERO_VOTI='{}'\
+                WHERE CHAT_ID='{}'".format(numero_voti, chatid_list[x]))
+                risposta(chatid_list[x],"C'è un nuovo voto!",bot)
+
 
 
 start_handler = CommandHandler(('start', 'help'), start)
