@@ -185,7 +185,7 @@ def periodo(bot, update, args):
     try:
         periodo = None
         chatid = update.message.chat.id
-        if len(args) > 1:
+        if len(args) != 1:
             risposta(
                 chatid,
                 "You may have made a mistake, check your input and try again", bot
@@ -204,7 +204,7 @@ def login(bot, update, args):
     print("login")
     chatid = update.message.chat.id
     try:
-        if len(args) > 2:
+        if len(args) != 2:
             risposta(
                 chatid,
                 "You may have made a mistake, check your input and try again", bot
@@ -371,7 +371,7 @@ def check_voti():
                 SET NUMERO_COMPITI='{}'\
                 WHERE CHAT_ID='{}'".format(numero_compiti, chatid_list[x]))
                 if numero_compiti_list[x]==0:
-                    risposta(chatid_list[x],"C'è un nuovo compito!(potrebbe non essere vero in quanto l'anno è appena iniziato e sono stati resettati i compiti)",bot)
+                    risposta(chatid_list[x],"C'è un nuovo compito! (potrebbe non essere vero in quanto l'anno è appena iniziato e sono stati resettati i compiti)",bot)
                 else:    
                  risposta(chatid_list[x],"C'è un nuovo compito!",bot)     
 
