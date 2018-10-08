@@ -79,12 +79,14 @@ exec_query("""CREATE TABLE IF NOT EXISTS CREDENTIALS (
   PASSWORD CHAR(60),
   PERIODO TINYINT DEFAULT 1,
   CHAT_ID CHAR(100),
-  NUMERO_VOTI INTEGER DEFAULT 0
+  NUMERO_VOTI INTEGER DEFAULT 0,
+  NUMERO_COMPITI INTEGER DEFAULT 0
 )""")
 
 
 def calcola_medie(username, password, periodo):
     classeviva_session = cv.Session()
+    classeviva_session.agenda
     classeviva_session.username = username
     classeviva_session.password = password
     try:
@@ -159,7 +161,18 @@ def calcola_medie(username, password, periodo):
             sign_replace(medie[materia]) + "</b>" + "\n"
 
     return output_risposta, conta_voti
+def calcola_compiti(username, password):
+    classeviva_session = cv.Session()
+    classeviva_session.agenda
+    classeviva_session.username = username
+    classeviva_session.password = password
+    try:
+        classeviva_session.login()
+    except cv.errors.AuthenticationFailedError:
+        raise ValueError("Login error")
 
+    agenda_json = classeviva_session.agenda(date.today(),date(date.today().year+1, 6, 12))
+    return len(agenda_json['agenda'])
 
 def start(bot, update):
     risposta_html(
@@ -314,6 +327,7 @@ def check_voti():
         periodo_list = []
         chatid_list = []
         numero_voti_list=[]
+        numero_compiti_list=[]
         sql = "SELECT * FROM CREDENTIALS"
         try:
             db = sqlite3.connect(bot_path + '/database.db')
@@ -326,6 +340,7 @@ def check_voti():
                 periodo_list.append(row[2])
                 chatid_list.append(row[3])
                 numero_voti_list.append(row[4])
+                numero_compiti_list.append(row[5])
         except Exception as e:
             handle_exception(e)
         finally:
@@ -344,6 +359,21 @@ def check_voti():
                     risposta(chatid_list[x],"C'è un nuovo voto!(potrebbe non essere vero in quanto l'anno è appena iniziato e sono stati resettati i voti)",bot)
                 else:    
                  risposta(chatid_list[x],"C'è un nuovo voto!",bot)
+
+
+            numero_compiti= calcola_compiti(username_list[x], password_list[x])
+            if numero_compiti < numero_compiti_list[x]:
+                exec_query("UPDATE CREDENTIALS \
+                SET NUMERO_COMPITI='{}'\
+                WHERE CHAT_ID='{}'".format(numero_compiti, chatid_list[x]))
+            elif numero_compiti > numero_compiti_list[x]:    # c'è un nuovo voto
+                exec_query("UPDATE CREDENTIALS \
+                SET NUMERO_COMPITI='{}'\
+                WHERE CHAT_ID='{}'".format(numero_compiti, chatid_list[x]))
+                if numero_compiti_list[x]==0:
+                    risposta(chatid_list[x],"C'è un nuovo compito!(potrebbe non essere vero in quanto l'anno è appena iniziato e sono stati resettati i compiti)",bot)
+                else:    
+                 risposta(chatid_list[x],"C'è un nuovo compito!",bot)     
 
 
 
