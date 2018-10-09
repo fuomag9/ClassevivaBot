@@ -163,6 +163,18 @@ def calcola_medie(username, password, periodo):
     return output_risposta, conta_voti
 
 
+def check_credentials(username, password):
+    classeviva_session = cv.Session()
+    classeviva_session.agenda
+    classeviva_session.username = username
+    classeviva_session.password = password
+    try:
+        classeviva_session.login()
+    except Exception:
+        return False
+    return True
+
+
 def calcola_compiti(username, password):
     classeviva_session = cv.Session()
     classeviva_session.agenda
@@ -229,7 +241,7 @@ def login(bot, update, args):
         handle_exception(e)
     finally:
         db.close()
-    if results == []:
+    if results == [] and check_credentials(username,password)==True:
         exec_query(
             "INSERT INTO CREDENTIALS (USERNAME,PASSWORD,CHAT_ID) VALUES('{}','{}','{}')".
             format(username, password, chatid))
@@ -350,40 +362,42 @@ def check_voti():
         finally:
             db.close()
 
-
-
         for x in range(0, len(username_list)):
-            numero_voti = calcola_medie(
-                username_list[x], password_list[x], periodo_list[x])[1]
-            exec_query("UPDATE CREDENTIALS \
+
+            if check_credentials(username_list[x], password_list[x]) == False:
+                exec_query(
+                    "DELETE FROM CREDENTIALS WHERE CHAT_ID='{}'".format(chatid_list[x]))
+                risposta(
+                    chatid_list[x], "Il tuo account è stato rimosso in quanto le tue credenziali sono errate", bot)
+            else:
+                numero_voti = calcola_medie(
+                    username_list[x], password_list[x], periodo_list[x])[1]
+                exec_query("UPDATE CREDENTIALS \
                 SET NUMERO_VOTI='{}'\
                 WHERE CHAT_ID='{}'".format(numero_voti, chatid_list[x]))
 
-            # il numero è incrementale, di conseguenza c'è un nuovo voto
-            if numero_voti > numero_voti_list[x]:
-                if numero_voti_list[x] == 0:
-                    risposta(
-                        chatid_list[x], "C'è un nuovo voto!(potrebbe non essere vero in quanto l'anno è appena iniziato e sono stati resettati i voti)", bot)
-                else:
-                    risposta(chatid_list[x], "C'è un nuovo voto!", bot)
+                # il numero è incrementale, di conseguenza c'è un nuovo voto
+                if numero_voti > numero_voti_list[x]:
+                    if numero_voti_list[x] == 0:
+                        risposta(
+                            chatid_list[x], "C'è un nuovo voto!(potrebbe non essere vero in quanto l'anno è appena iniziato e sono stati resettati i voti)", bot)
+                    else:
+                        risposta(chatid_list[x], "C'è un nuovo voto!", bot)
 
+                numero_compiti = calcola_compiti(
+                    username_list[x], password_list[x])
 
-
-
-            numero_compiti = calcola_compiti(
-                username_list[x], password_list[x])
-
-            exec_query("UPDATE CREDENTIALS \
+                exec_query("UPDATE CREDENTIALS \
                 SET NUMERO_COMPITI='{}'\
                 WHERE CHAT_ID='{}'".format(numero_compiti, chatid_list[x]))
-            # il numero è incrementale, di conseguenza c'è un nuovo voto
-            if numero_compiti > numero_compiti_list[x]:
+                # il numero è incrementale, di conseguenza c'è un nuovo voto
+                if numero_compiti > numero_compiti_list[x]:
 
-                if numero_compiti_list[x] == 0:
-                    risposta(
-                        chatid_list[x], "C'è un nuovo compito! (potrebbe non essere vero in quanto l'anno è appena iniziato e sono stati resettati i compiti)", bot)
-                else:
-                    risposta(chatid_list[x], "C'è un nuovo compito!", bot)
+                    if numero_compiti_list[x] == 0:
+                        risposta(
+                            chatid_list[x], "C'è un nuovo compito! (potrebbe non essere vero in quanto l'anno è appena iniziato e sono stati resettati i compiti)", bot)
+                    else:
+                        risposta(chatid_list[x], "C'è un nuovo compito!", bot)
 
 
 start_handler = CommandHandler(('start', 'help'), start)
