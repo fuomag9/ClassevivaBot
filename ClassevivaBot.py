@@ -349,7 +349,7 @@ def notifiche(bot, update, args):
 
     exec_query("UPDATE CREDENTIALS SET PREFERENZA_NOTIFICHE_{}='{}' WHERE CHAT_ID='{}'".format(
         tipo.upper(), status, chatid))
-    risposta(chatid, "Le credenziali per {} sono state {}te".format(
+    risposta(chatid, "Le notifiche per {} sono state {}te".format(
         tipo, status_backup), bot)
 
 
