@@ -364,14 +364,17 @@ def user_status():
 
         for x in range(0, len(username_list)):
 
-#controlla voti
+#controlla status credenziali
 
             if check_credentials(username_list[x], password_list[x]) == False:
                 exec_query(
                     "DELETE FROM CREDENTIALS WHERE CHAT_ID='{}'".format(chatid_list[x]))
                 risposta(
                     chatid_list[x], "Il tuo account è stato rimosso in quanto le tue credenziali sono errate", bot)
+                print("removed credentials of chatid {}".format(chatid_list[x]))    
             else:
+
+#controlla voti                
                 numero_voti = calcola_medie(
                     username_list[x], password_list[x], periodo_list[x])[1]
                 exec_query("UPDATE CREDENTIALS \
