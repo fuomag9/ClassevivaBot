@@ -337,7 +337,7 @@ def notifiche(bot, update, args):
     tipo = args[0]
     status = args[1]
     status_backup = status
-    if tipo != "compiti" or tipo != "voti" or status != "abilita" or status != "disabilita":
+    if (tipo != "compiti" and tipo != "voti") or (status != "abilita" and status != "disabilita"):
         risposta(
             chatid, "Si è verificato un errore, controlla ciò che hai scritto, potresti aver sbagliato", bot)
         return
@@ -349,7 +349,7 @@ def notifiche(bot, update, args):
 
     exec_query("UPDATE CREDENTIALS SET PREFERENZA_NOTIFICHE_{}='{}' WHERE CHAT_ID='{}'".format(
         tipo.upper(), status, chatid))
-    risposta(chatid, "Le credenziali per {} sono state impostate su {}".format(
+    risposta(chatid, "Le credenziali per {} sono state {}te".format(
         tipo, status_backup), bot)
 
 
