@@ -334,7 +334,7 @@ def telegram_bot():
             handle_exception(e)
 
 
-def check_voti():
+def user_status():
     global updater
     bot = updater.bot
     while (1):
@@ -364,6 +364,8 @@ def check_voti():
 
         for x in range(0, len(username_list)):
 
+#controlla voti
+
             if check_credentials(username_list[x], password_list[x]) == False:
                 exec_query(
                     "DELETE FROM CREDENTIALS WHERE CHAT_ID='{}'".format(chatid_list[x]))
@@ -380,9 +382,11 @@ def check_voti():
                 if numero_voti > numero_voti_list[x]:
                     if numero_voti_list[x] == 0:
                         risposta(
-                            chatid_list[x], "C'è un nuovo voto!(potrebbe non essere vero in quanto l'anno è appena iniziato e sono stati resettati i voti)", bot)
+                            chatid_list[x], "C'è un nuovo voto!\n(potrebbe non essere vero in quanto l'anno è appena iniziato e sono stati resettati i voti)", bot)
                     else:
                         risposta(chatid_list[x], "C'è un nuovo voto!", bot)
+
+#controlla compiti
 
                 numero_compiti = calcola_compiti(
                     username_list[x], password_list[x])
@@ -390,12 +394,13 @@ def check_voti():
                 exec_query("UPDATE CREDENTIALS \
                 SET NUMERO_COMPITI='{}'\
                 WHERE CHAT_ID='{}'".format(numero_compiti, chatid_list[x]))
+
                 # il numero è incrementale, di conseguenza c'è un nuovo voto
                 if numero_compiti > numero_compiti_list[x]:
 
                     if numero_compiti_list[x] == 0:
                         risposta(
-                            chatid_list[x], "C'è un nuovo compito! (potrebbe non essere vero in quanto l'anno è appena iniziato e sono stati resettati i compiti)", bot)
+                            chatid_list[x], "C'è un nuovo compito!\n(potrebbe non essere vero in quanto l'anno è appena iniziato e sono stati resettati i compiti)", bot)
                     else:
                         risposta(chatid_list[x], "C'è un nuovo compito!", bot)
 
@@ -417,9 +422,9 @@ dispatcher.add_handler(medie_handler)
 
 
 threads = []
-check_voti_thread = threading.Thread(target=check_voti)
+user_status_thread = threading.Thread(target=user_status)
 telegram_bot_thread = threading.Thread(target=telegram_bot)
-threads.append(check_voti_thread)
+threads.append(user_status_thread)
 threads.append(telegram_bot_thread)
-check_voti_thread.start()
+user_status_thread.start()
 telegram_bot_thread.start()
