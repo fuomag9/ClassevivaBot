@@ -80,7 +80,9 @@ exec_query("""CREATE TABLE IF NOT EXISTS CREDENTIALS (
   PERIODO TINYINT DEFAULT 1,
   CHAT_ID CHAR(100),
   NUMERO_VOTI INTEGER DEFAULT 0,
-  NUMERO_COMPITI INTEGER DEFAULT 0
+  NUMERO_COMPITI INTEGER DEFAULT 0,
+  PREFERENZA_NOTIFICHE_VOTI TINYINT DEFAULT 0,
+  PREFERENZA_NOTIFICHE_COMPITI TINYINT DEFAULT 0
 )""")
 
 
@@ -193,7 +195,7 @@ def calcola_compiti(username, password):
 def start(bot, update):
     risposta_html(
         update.message.chat.id,
-        "/login <i>username</i> <i>password</i> per accedere\n/logout per disconnettersi\n/periodo per impostare il numero del periodo \n /medie per vedere le medie e che voto per avere la sufficenza ", bot
+        "/login <i>username</i> <i>password</i> per accedere\n/logout per disconnettersi\n/periodo per impostare il numero del periodo \n /medie per vedere le medie e che voto per avere la sufficenza\n /notifiche per impostare le preferenze di notifica ", bot
     )
 
 
@@ -204,7 +206,7 @@ def periodo(bot, update, args):
         if len(args) != 1:
             risposta(
                 chatid,
-                "You may have made a mistake, check your input and try again", bot
+                "Si è verificato un errore, controlla ciò che hai scritto, potresti aver sbagliato", bot
             )
             return
         periodo = args[0]
@@ -223,7 +225,7 @@ def login(bot, update, args):
         if len(args) != 2:
             risposta(
                 chatid,
-                "You may have made a mistake, check your input and try again", bot
+                "Si è verificato un errore, controlla ciò che hai scritto, potresti aver sbagliato", bot
             )
             return
         username = args[0]
@@ -241,7 +243,7 @@ def login(bot, update, args):
         handle_exception(e)
     finally:
         db.close()
-    if results == [] and check_credentials(username,password)==True:
+    if results == [] and check_credentials(username, password) == True:
         exec_query(
             "INSERT INTO CREDENTIALS (USERNAME,PASSWORD,CHAT_ID) VALUES('{}','{}','{}')".
             format(username, password, chatid))
@@ -307,7 +309,7 @@ def medie(bot, update):
     if results == []:
         risposta(
             chatid,
-            "Non è mai stato fatto il login, effettualo attraverso il comando apposito", bot
+            "Non è stato fatto il login, effettualo attraverso il comando apposito", bot
         )
         return
     output_risposta = []
@@ -323,6 +325,32 @@ def medie(bot, update):
         elif error_value == "Login error":
             risposta(
                 chatid, "Errore, probabilmente le tue credenziali sono errate, fai il logout e riprova", bot)
+
+
+def notifiche(bot, update, args):
+    chatid = update.message.chat.id
+    if len(args) != 2:
+        risposta(chatid, "Il funzionamento del comando è /notifiche tipo abilita/disabilita\n \
+        I tipi disponibili sono: compiti, voti\n \
+        comando di esempio: /notifiche voti disabilita", bot)
+        return
+    tipo = args[0]
+    status = args[1]
+    status_backup = status
+    if tipo != "compiti" or tipo != "voti" or status != "abilita" or status != "disabilita":
+        risposta(
+            chatid, "Si è verificato un errore, controlla ciò che hai scritto, potresti aver sbagliato", bot)
+        return
+    else:
+        if status == "disabilita":
+            status = 1
+        else:
+            status = 0
+
+    exec_query("UPDATE CREDENTIALS SET PREFERENZA_NOTIFICHE_{}='{}' WHERE CHAT_ID='{}'".format(
+        tipo.upper(), status, chatid))
+    risposta(chatid, "Le credenziali per {} sono state impostate su {}".format(
+        tipo, status_backup), bot)
 
 
 def telegram_bot():
@@ -344,6 +372,8 @@ def user_status():
         chatid_list = []
         numero_voti_list = []
         numero_compiti_list = []
+        preferenza_notifiche_voti_list = []
+        preferenza_notifiche_compiti_list = []
         sql = "SELECT * FROM CREDENTIALS"
         try:
             db = sqlite3.connect(bot_path + '/database.db')
@@ -357,6 +387,8 @@ def user_status():
                 chatid_list.append(row[3])
                 numero_voti_list.append(row[4])
                 numero_compiti_list.append(row[5])
+                preferenza_notifiche_voti_list.append(row[6])
+                preferenza_notifiche_compiti_list.append(row[7])
         except Exception as e:
             handle_exception(e)
         finally:
@@ -364,48 +396,51 @@ def user_status():
 
         for x in range(0, len(username_list)):
 
-#controlla status credenziali
+         # controlla status credenziali
 
             if check_credentials(username_list[x], password_list[x]) == False:
                 exec_query(
                     "DELETE FROM CREDENTIALS WHERE CHAT_ID='{}'".format(chatid_list[x]))
                 risposta(
                     chatid_list[x], "Il tuo account è stato rimosso in quanto le tue credenziali sono errate", bot)
-                print("removed credentials of chatid {}".format(chatid_list[x]))    
+                print("removed credentials of chatid {}".format(
+                    chatid_list[x]))
+
             else:
 
-#controlla voti                
+                # controlla voti
+
                 numero_voti = calcola_medie(
                     username_list[x], password_list[x], periodo_list[x])[1]
-                exec_query("UPDATE CREDENTIALS \
-                SET NUMERO_VOTI='{}'\
-                WHERE CHAT_ID='{}'".format(numero_voti, chatid_list[x]))
 
-                # il numero è incrementale, di conseguenza c'è un nuovo voto
-                if numero_voti > numero_voti_list[x]:
-                    if numero_voti_list[x] == 0:
-                        risposta(
-                            chatid_list[x], "C'è un nuovo voto!\n(potrebbe non essere vero in quanto l'anno è appena iniziato e sono stati resettati i voti)", bot)
-                    else:
-                        risposta(chatid_list[x], "C'è un nuovo voto!", bot)
+                exec_query("UPDATE CREDENTIALS SET NUMERO_VOTI='{}' WHERE CHAT_ID='{}'".format(
+                    numero_voti, chatid_list[x]))
+                if preferenza_notifiche_voti_list[x] == 0:
+                    # il numero è incrementale, di conseguenza c'è un nuovo voto
+                    if numero_voti > numero_voti_list[x]:
+                        if numero_voti_list[x] == 0:
+                            risposta(
+                                chatid_list[x], "C'è un nuovo voto!\n(potrebbe non essere vero in quanto l'anno è appena iniziato e sono stati resettati i voti)", bot)
+                        else:
+                            risposta(chatid_list[x], "C'è un nuovo voto!", bot)
 
-#controlla compiti
+                # controlla compiti
 
                 numero_compiti = calcola_compiti(
                     username_list[x], password_list[x])
 
-                exec_query("UPDATE CREDENTIALS \
-                SET NUMERO_COMPITI='{}'\
-                WHERE CHAT_ID='{}'".format(numero_compiti, chatid_list[x]))
+                exec_query("UPDATE CREDENTIALS SET NUMERO_COMPITI='{}' WHERE CHAT_ID='{}'".format(
+                    numero_compiti, chatid_list[x]))
+                if preferenza_notifiche_compiti_list[x] == 0:
+                    # il numero è incrementale, di conseguenza c'è un nuovo voto
+                    if numero_compiti > numero_compiti_list[x]:
 
-                # il numero è incrementale, di conseguenza c'è un nuovo voto
-                if numero_compiti > numero_compiti_list[x]:
-
-                    if numero_compiti_list[x] == 0:
-                        risposta(
-                            chatid_list[x], "C'è un nuovo compito!\n(potrebbe non essere vero in quanto l'anno è appena iniziato e sono stati resettati i compiti)", bot)
-                    else:
-                        risposta(chatid_list[x], "C'è un nuovo compito!", bot)
+                        if numero_compiti_list[x] == 0:
+                            risposta(
+                                chatid_list[x], "C'è un nuovo compito!\n(potrebbe non essere vero in quanto l'anno è appena iniziato e sono stati resettati i compiti)", bot)
+                        else:
+                            risposta(chatid_list[x],
+                                     "C'è un nuovo compito!", bot)
 
 
 start_handler = CommandHandler(('start', 'help'), start)
@@ -422,6 +457,9 @@ dispatcher.add_handler(logout_handler)
 
 medie_handler = CommandHandler('medie', medie)
 dispatcher.add_handler(medie_handler)
+
+notifiche_handler = CommandHandler('notifiche', notifiche, pass_args=True)
+dispatcher.add_handler(notifiche_handler)
 
 
 threads = []
