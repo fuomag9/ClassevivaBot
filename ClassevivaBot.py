@@ -128,18 +128,18 @@ def calcola_medie(username, password, periodo):
             else:
                 medie[materia] = tupla_voto[0]
 
-        #voti sufficienza        
+        # voti sufficienza
         voti_sufficienza[materia] = round(
             solve((incognita_eq + medie[materia]) /
                   (len(dizionario_voti[materia]) + 1) - 6)[0], 2)
 
-        #medie delle materie          
+        # medie delle materie
         medie[materia] = round(medie[materia] / len(dizionario_voti[materia]),
                                2)
-        #conta voti
-        conta_voti=0
+        # conta voti
+        conta_voti = 0
         for materia in dizionario_voti:
-            conta_voti=conta_voti+len(dizionario_voti[materia])   
+            conta_voti = conta_voti+len(dizionario_voti[materia])
 
     def sign_replace(x):
         if ".25" in str(x):
@@ -161,6 +161,8 @@ def calcola_medie(username, password, periodo):
             sign_replace(medie[materia]) + "</b>" + "\n"
 
     return output_risposta, conta_voti
+
+
 def calcola_compiti(username, password):
     classeviva_session = cv.Session()
     classeviva_session.agenda
@@ -171,8 +173,10 @@ def calcola_compiti(username, password):
     except cv.errors.AuthenticationFailedError:
         raise ValueError("Login error")
 
-    agenda_json = classeviva_session.agenda(date.today(),date(date.today().year+1, 6, 12))
+    agenda_json = classeviva_session.agenda(
+        date.today(), date(date.today().year+1, 6, 12))
     return len(agenda_json['agenda'])
+
 
 def start(bot, update):
     risposta_html(
@@ -326,8 +330,8 @@ def check_voti():
         password_list = []
         periodo_list = []
         chatid_list = []
-        numero_voti_list=[]
-        numero_compiti_list=[]
+        numero_voti_list = []
+        numero_compiti_list = []
         sql = "SELECT * FROM CREDENTIALS"
         try:
             db = sqlite3.connect(bot_path + '/database.db')
@@ -345,36 +349,41 @@ def check_voti():
             handle_exception(e)
         finally:
             db.close()
+
+
+
         for x in range(0, len(username_list)):
-            numero_voti= calcola_medie(username_list[x], password_list[x], periodo_list[x])[1]
-            if numero_voti < numero_voti_list[x]:
-                exec_query("UPDATE CREDENTIALS \
+            numero_voti = calcola_medie(
+                username_list[x], password_list[x], periodo_list[x])[1]
+            exec_query("UPDATE CREDENTIALS \
                 SET NUMERO_VOTI='{}'\
                 WHERE CHAT_ID='{}'".format(numero_voti, chatid_list[x]))
-            elif numero_voti > numero_voti_list[x]:    # c'è un nuovo voto
-                exec_query("UPDATE CREDENTIALS \
-                SET NUMERO_VOTI='{}'\
-                WHERE CHAT_ID='{}'".format(numero_voti, chatid_list[x]))
-                if numero_voti_list[x]==0:
-                    risposta(chatid_list[x],"C'è un nuovo voto!(potrebbe non essere vero in quanto l'anno è appena iniziato e sono stati resettati i voti)",bot)
-                else:    
-                 risposta(chatid_list[x],"C'è un nuovo voto!",bot)
+
+            # il numero è incrementale, di conseguenza c'è un nuovo voto
+            if numero_voti > numero_voti_list[x]:
+                if numero_voti_list[x] == 0:
+                    risposta(
+                        chatid_list[x], "C'è un nuovo voto!(potrebbe non essere vero in quanto l'anno è appena iniziato e sono stati resettati i voti)", bot)
+                else:
+                    risposta(chatid_list[x], "C'è un nuovo voto!", bot)
 
 
-            numero_compiti= calcola_compiti(username_list[x], password_list[x])
-            if numero_compiti < numero_compiti_list[x]:
-                exec_query("UPDATE CREDENTIALS \
+
+
+            numero_compiti = calcola_compiti(
+                username_list[x], password_list[x])
+
+            exec_query("UPDATE CREDENTIALS \
                 SET NUMERO_COMPITI='{}'\
                 WHERE CHAT_ID='{}'".format(numero_compiti, chatid_list[x]))
-            elif numero_compiti > numero_compiti_list[x]:    # c'è un nuovo voto
-                exec_query("UPDATE CREDENTIALS \
-                SET NUMERO_COMPITI='{}'\
-                WHERE CHAT_ID='{}'".format(numero_compiti, chatid_list[x]))
-                if numero_compiti_list[x]==0:
-                    risposta(chatid_list[x],"C'è un nuovo compito! (potrebbe non essere vero in quanto l'anno è appena iniziato e sono stati resettati i compiti)",bot)
-                else:    
-                 risposta(chatid_list[x],"C'è un nuovo compito!",bot)     
+            # il numero è incrementale, di conseguenza c'è un nuovo voto
+            if numero_compiti > numero_compiti_list[x]:
 
+                if numero_compiti_list[x] == 0:
+                    risposta(
+                        chatid_list[x], "C'è un nuovo compito! (potrebbe non essere vero in quanto l'anno è appena iniziato e sono stati resettati i compiti)", bot)
+                else:
+                    risposta(chatid_list[x], "C'è un nuovo compito!", bot)
 
 
 start_handler = CommandHandler(('start', 'help'), start)
