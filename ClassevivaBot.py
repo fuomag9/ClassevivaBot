@@ -172,7 +172,7 @@ def check_credentials(username, password):
     classeviva_session.password = password
     try:
         classeviva_session.login()
-    except Exception:
+    except cv.errors.AuthenticationFailedError:
         return False
     return True
 
