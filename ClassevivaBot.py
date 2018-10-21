@@ -78,31 +78,35 @@ exec_query("""CREATE TABLE IF NOT EXISTS CREDENTIALS (
   USERNAME CHAR(60) NOT NULL,
   PASSWORD CHAR(60),
   PERIODO TINYINT DEFAULT 1,
-  CHAT_ID CHAR(100)
+  CHAT_ID CHAR(100),
+  NUMERO_VOTI INTEGER DEFAULT 0,
+  NUMERO_COMPITI INTEGER DEFAULT 0,
+  PREFERENZA_NOTIFICHE_VOTI TINYINT DEFAULT 0,
+  PREFERENZA_NOTIFICHE_COMPITI TINYINT DEFAULT 0
 )""")
 
 
 def calcola_medie(username, password, periodo):
     classeviva_session = cv.Session()
+    classeviva_session.agenda
     classeviva_session.username = username
     classeviva_session.password = password
     try:
-        classeviva_session.login(classeviva_session.username,
-                                 classeviva_session.password)
+        classeviva_session.login()
     except cv.errors.AuthenticationFailedError:
         raise ValueError("Login error")
 
     voti_json = classeviva_session.grades()
     classeviva_session.logout()
+
     if voti_json['grades'] == []:
         raise ValueError('No grades')
+
     voti_periodo = []
     voti_periodo_fix = []
     dizionario_voti = {}
     medie = {}
-    medie_vecchie = {}
     voti_sufficienza = {}
-    voti_nuovi = []
     output_risposta = ''
     for x in voti_json['grades']:  # ottenimento lista voti
         voti_periodo.append(x)
@@ -125,35 +129,19 @@ def calcola_medie(username, password, periodo):
                 medie[materia] += tupla_voto[0]
             else:
                 medie[materia] = tupla_voto[0]
+
+        # voti sufficienza
         voti_sufficienza[materia] = round(
             solve((incognita_eq + medie[materia]) /
                   (len(dizionario_voti[materia]) + 1) - 6)[0], 2)
+
+        # medie delle materie
         medie[materia] = round(medie[materia] / len(dizionario_voti[materia]),
                                2)
-
-    # trovare voti nuovi
-    for materia in dizionario_voti:
-        if dizionario_voti[materia][len(dizionario_voti[materia])
-                                    - 1][1].split("-")[2] == date.today().day:
-            voti_nuovi.append(materia)
-    # calcolare media vecchia
-    if voti_nuovi != []:
+        # conta voti
+        conta_voti = 0
         for materia in dizionario_voti:
-            if materia in voti_nuovi:
-                dizionario_voti[materia] = dizionario_voti[materia][:-1]
-                # rimuove l'ultimo elemento dall'array del voto(in quanto l'ultimo voto dovrebbe essere quello nuovo)
-            else:
-                dizionario_voti.pop(materia)
-                # rimuove la materia nelle quali non sono cambiati i voti
-        for materia in dizionario_voti:
-            for tupla_voto in dizionario_voti[materia]:
-                if materia in medie_vecchie:
-                    # i dizionari sono stupidi e se la key non esiste già non si può utilizzare +=
-                    medie_vecchie[materia] += tupla_voto[0]
-                else:
-                    medie_vecchie[materia] = tupla_voto[0]
-            medie_vecchie[materia] = round(
-                medie_vecchie[materia] / len(dizionario_voti[materia]), 2)
+            conta_voti = conta_voti+len(dizionario_voti[materia])
 
     def sign_replace(x):
         if ".25" in str(x):
@@ -174,13 +162,40 @@ def calcola_medie(username, password, periodo):
             "<b>" + str(materia) + "</b>" + " è " + "<b>" + \
             sign_replace(medie[materia]) + "</b>" + "\n"
 
-    return output_risposta, medie_vecchie
+    return output_risposta, conta_voti
+
+
+def check_credentials(username, password):
+    classeviva_session = cv.Session()
+    classeviva_session.agenda
+    classeviva_session.username = username
+    classeviva_session.password = password
+    try:
+        classeviva_session.login()
+    except cv.errors.AuthenticationFailedError:
+        return False
+    return True
+
+
+def calcola_compiti(username, password):
+    classeviva_session = cv.Session()
+    classeviva_session.agenda
+    classeviva_session.username = username
+    classeviva_session.password = password
+    try:
+        classeviva_session.login()
+    except cv.errors.AuthenticationFailedError:
+        raise ValueError("Login error")
+
+    agenda_json = classeviva_session.agenda(
+        date.today(), date(date.today().year+1, 6, 12))
+    return len(agenda_json['agenda'])
 
 
 def start(bot, update):
     risposta_html(
         update.message.chat.id,
-        "/login <i>username</i> <i>password</i> per accedere\n/logout per disconnettersi\n/periodo per impostare il numero del periodo \n /medie per vedere le medie e che voto per avere la sufficenza ", bot
+        "/login <i>username</i> <i>password</i> per accedere\n/logout per disconnettersi\n/periodo per impostare il numero del periodo \n /medie per vedere le medie e che voto per avere la sufficenza\n /notifiche per impostare le preferenze di notifica ", bot
     )
 
 
@@ -188,10 +203,10 @@ def periodo(bot, update, args):
     try:
         periodo = None
         chatid = update.message.chat.id
-        if len(args) > 1:
+        if len(args) != 1:
             risposta(
                 chatid,
-                "You may have made a mistake, check your input and try again", bot
+                "Si è verificato un errore, controlla ciò che hai scritto, potresti aver sbagliato", bot
             )
             return
         periodo = args[0]
@@ -207,10 +222,10 @@ def login(bot, update, args):
     print("login")
     chatid = update.message.chat.id
     try:
-        if len(args) > 2:
+        if len(args) != 2:
             risposta(
                 chatid,
-                "You may have made a mistake, check your input and try again", bot
+                "Si è verificato un errore, controlla ciò che hai scritto, potresti aver sbagliato", bot
             )
             return
         username = args[0]
@@ -228,7 +243,7 @@ def login(bot, update, args):
         handle_exception(e)
     finally:
         db.close()
-    if results == []:
+    if results == [] and check_credentials(username, password) == True:
         exec_query(
             "INSERT INTO CREDENTIALS (USERNAME,PASSWORD,CHAT_ID) VALUES('{}','{}','{}')".
             format(username, password, chatid))
@@ -237,7 +252,10 @@ def login(bot, update, args):
             "login effettuato correttamente, il periodo impostato è il primo", bot
         )
     else:
-        risposta(chatid, "Il login è già stato effettuato", bot)
+        if check_credentials(username, password) == False:
+            risposta(chatid, "credenziali errate", bot)
+        else:
+            risposta(chatid, "Il login è già stato effettuato", bot)
 
 
 def logout(bot, update):
@@ -294,7 +312,7 @@ def medie(bot, update):
     if results == []:
         risposta(
             chatid,
-            "Non è mai stato fatto il login, effettualo attraverso il comando apposito", bot
+            "Non è stato fatto il login, effettualo attraverso il comando apposito", bot
         )
         return
     output_risposta = []
@@ -312,6 +330,32 @@ def medie(bot, update):
                 chatid, "Errore, probabilmente le tue credenziali sono errate, fai il logout e riprova", bot)
 
 
+def notifiche(bot, update, args):
+    chatid = update.message.chat.id
+    if len(args) != 2:
+        risposta(chatid, "Il funzionamento del comando è /notifiche tipo abilita/disabilita\n \
+        I tipi disponibili sono: compiti, voti\n \
+        comando di esempio: /notifiche voti disabilita", bot)
+        return
+    tipo = args[0]
+    status = args[1]
+    status_backup = status
+    if (tipo != "compiti" and tipo != "voti") or (status != "abilita" and status != "disabilita"):
+        risposta(
+            chatid, "Si è verificato un errore, controlla ciò che hai scritto, potresti aver sbagliato", bot)
+        return
+    else:
+        if status == "disabilita":
+            status = 1
+        else:
+            status = 0
+
+    exec_query("UPDATE CREDENTIALS SET PREFERENZA_NOTIFICHE_{}='{}' WHERE CHAT_ID='{}'".format(
+        tipo.upper(), status, chatid))
+    risposta(chatid, "Le notifiche per {} sono state {}te".format(
+        tipo, status_backup), bot)
+
+
 def telegram_bot():
 
     while True:
@@ -321,8 +365,85 @@ def telegram_bot():
             handle_exception(e)
 
 
-def check_voti():
-    pass
+def user_status():
+    global updater
+    bot = updater.bot
+    while (1):
+        username_list = []
+        password_list = []
+        periodo_list = []
+        chatid_list = []
+        numero_voti_list = []
+        numero_compiti_list = []
+        preferenza_notifiche_voti_list = []
+        preferenza_notifiche_compiti_list = []
+        sql = "SELECT * FROM CREDENTIALS"
+        try:
+            db = sqlite3.connect(bot_path + '/database.db')
+            cursor = db.cursor()
+            cursor.execute(sql)
+            results = cursor.fetchall()
+            for row in results:
+                username_list.append(row[0])
+                password_list.append(row[1])
+                periodo_list.append(row[2])
+                chatid_list.append(row[3])
+                numero_voti_list.append(row[4])
+                numero_compiti_list.append(row[5])
+                preferenza_notifiche_voti_list.append(row[6])
+                preferenza_notifiche_compiti_list.append(row[7])
+        except Exception as e:
+            handle_exception(e)
+        finally:
+            db.close()
+
+        for x in range(0, len(username_list)):
+
+            # controlla status credenziali
+
+            if check_credentials(username_list[x], password_list[x]) == False:
+                exec_query(
+                    "DELETE FROM CREDENTIALS WHERE CHAT_ID='{}'".format(chatid_list[x]))
+                risposta(
+                    chatid_list[x], "Il tuo account è stato rimosso in quanto le tue credenziali sono errate", bot)
+                print("removed credentials of chatid {}".format(
+                    chatid_list[x]))
+
+            else:
+
+                # controlla voti
+
+                numero_voti = calcola_medie(
+                    username_list[x], password_list[x], periodo_list[x])[1]
+
+                exec_query("UPDATE CREDENTIALS SET NUMERO_VOTI='{}' WHERE CHAT_ID='{}'".format(
+                    numero_voti, chatid_list[x]))
+                if preferenza_notifiche_voti_list[x] == 0:
+                    # il numero è incrementale, di conseguenza c'è un nuovo voto
+                    if numero_voti > numero_voti_list[x]:
+                        if numero_voti_list[x] == 0:
+                            risposta(
+                                chatid_list[x], "C'è un nuovo voto!\n(potrebbe non essere vero in quanto l'anno è appena iniziato e sono stati resettati i voti)", bot)
+                        else:
+                            risposta(chatid_list[x], "C'è un nuovo voto!", bot)
+
+                # controlla compiti
+
+                numero_compiti = calcola_compiti(
+                    username_list[x], password_list[x])
+
+                exec_query("UPDATE CREDENTIALS SET NUMERO_COMPITI='{}' WHERE CHAT_ID='{}'".format(
+                    numero_compiti, chatid_list[x]))
+                if preferenza_notifiche_compiti_list[x] == 0:
+                    # il numero è incrementale, di conseguenza c'è un nuovo voto
+                    if numero_compiti > numero_compiti_list[x]:
+
+                        if numero_compiti_list[x] == 0:
+                            risposta(
+                                chatid_list[x], "C'è un nuovo compito!\n(potrebbe non essere vero in quanto l'anno è appena iniziato e sono stati resettati i compiti)", bot)
+                        else:
+                            risposta(chatid_list[x],
+                                     "C'è un nuovo compito!", bot)
 
 
 start_handler = CommandHandler(('start', 'help'), start)
@@ -340,11 +461,14 @@ dispatcher.add_handler(logout_handler)
 medie_handler = CommandHandler('medie', medie)
 dispatcher.add_handler(medie_handler)
 
+notifiche_handler = CommandHandler('notifiche', notifiche, pass_args=True)
+dispatcher.add_handler(notifiche_handler)
+
 
 threads = []
-check_voti_thread = threading.Thread(target=check_voti)
+user_status_thread = threading.Thread(target=user_status)
 telegram_bot_thread = threading.Thread(target=telegram_bot)
-threads.append(check_voti_thread)
+threads.append(user_status_thread)
 threads.append(telegram_bot_thread)
-check_voti_thread.start()
+user_status_thread.start()
 telegram_bot_thread.start()
