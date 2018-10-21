@@ -252,7 +252,10 @@ def login(bot, update, args):
             "login effettuato correttamente, il periodo impostato è il primo", bot
         )
     else:
-        risposta(chatid, "Il login è già stato effettuato", bot)
+        if check_credentials(username, password) == False:
+            risposta(chatid, "credenziali errate", bot)
+        else:
+            risposta(chatid, "Il login è già stato effettuato", bot)
 
 
 def logout(bot, update):
@@ -396,7 +399,7 @@ def user_status():
 
         for x in range(0, len(username_list)):
 
-         # controlla status credenziali
+            # controlla status credenziali
 
             if check_credentials(username_list[x], password_list[x]) == False:
                 exec_query(
