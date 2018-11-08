@@ -26,15 +26,33 @@ ap.add_argument(
     default=os.getcwd(),
     help="set the bot's working-folder, default is folder from where the bot is executed"
 )
+ap.add_argument(
+    "-sentry",
+    required=False,
+    type=str,
+    default="",
+    help="Your sentry personal url")
+    
+        
 args = vars(ap.parse_args())
 updater = Updater(token=args["key"])
 dispatcher = updater.dispatcher
 bot_path = args["working_folder"]
+sentry_key = args["sentry"]
 incognita_eq = Symbol("x")
 
 
-def handle_exception(e):
-    print(str(e))
+# enable sentry if sentry_key is passed as an argument
+if sentry_key != "":
+    import sentry_sdk
+    sentry_sdk.init(sentry_key)
+
+    def handle_exception(e):
+        sentry_sdk.capture_exception()
+else:
+
+    def handle_exception(e):
+        print(str(e))
 
 
 def risposta(sender, messaggio, bot):
