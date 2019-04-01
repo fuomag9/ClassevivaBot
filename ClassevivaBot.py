@@ -374,15 +374,6 @@ def notifiche(bot, update, args):
         tipo, status_backup), bot)
 
 
-def telegram_bot():
-
-    while True:
-        try:
-            updater.start_polling()
-        except Exception as e:
-            handle_exception(e)
-
-
 def user_status():
     global updater
     bot = updater.bot
@@ -483,10 +474,7 @@ notifiche_handler = CommandHandler('notifiche', notifiche, pass_args=True)
 dispatcher.add_handler(notifiche_handler)
 
 
-threads = []
-user_status_thread = threading.Thread(target=user_status)
-telegram_bot_thread = threading.Thread(target=telegram_bot)
-threads.append(user_status_thread)
-threads.append(telegram_bot_thread)
-user_status_thread.start()
-telegram_bot_thread.start()
+threading.Thread(target=user_status).start()
+
+updater.start_polling()
+updater.idle()
